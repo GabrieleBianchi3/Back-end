@@ -63,6 +63,18 @@ class PollDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PollDetailSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
 
+    def update(self, request, *args, **kwargs):
+        poll = self.get_object()
+
+        # Blocca la modifica se ci sono già voti
+        if poll.votes.exists():
+            return Response(
+                {"error": "Non puoi modificare un sondaggio che ha già ricevuto voti."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().update(request, *args, **kwargs)
+
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])

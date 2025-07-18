@@ -40,7 +40,7 @@ class Choice(models.Model):
         related_name='choices'
     )
     text = models.CharField(max_length=200)
-    created_at = models.DateTimeField(auto_now_add=True)
+
 
     class Meta:
         ordering = ['id']
