@@ -117,8 +117,9 @@
 
     function showEditForm(pollId) {
     console.log("🚀 showEditForm invoked for poll", pollId);
-  // 1) recupera i dati correnti dal backend
-  fetch(`/api/polls/${pollId}/`)
+
+    // 1) recupera i dati correnti dal backend
+    fetch(`/api/polls/${pollId}/`)
     .then(res => {
       if (!res.ok) throw new Error("Impossibile recuperare il sondaggio");
       return res.json();
@@ -132,9 +133,7 @@
       const newDesc = prompt("Modifica la descrizione:", poll.description || "");
       if (newDesc === null) return;
 
-
-
-      // 5) invia la PATCH
+      // 4) invia la PATCH
       return fetch(`/api/polls/${pollId}/`, {
         method: "PATCH",
         headers: {
@@ -305,12 +304,16 @@
             <button class="btn btn-sm btn-primary me-2" onclick="loadChoices(${poll.id})">Vota</button>
             <button class="btn btn-sm btn-secondary me-2" onclick="viewResults(${poll.id})">Risultati</button>`;
           if (isOwner) {
+            if (poll.total_votes >= 1) {
+              actions += `
+                <button class="btn btn-sm btn-danger" onclick="deletePoll(${poll.id})">Cancella</button>
+                <h8> Sondaggio non modificabile, perché ha già dei voti registrati </h8>`;
+            }
+            else{
             actions += `
-                <button class="btn btn-sm btn-outline-info me-2"
-                        onclick="showEditForm(${poll.id})">
-                Modifica
-                </button>
+                <button class="btn btn-sm btn-outline-info me-2" onclick="showEditForm(${poll.id})"> Modifica </button>
                 <button class="btn btn-sm btn-danger" onclick="deletePoll(${poll.id})">Cancella</button>`;
+            }
           }
           const li = document.createElement("li");
           li.className = "list-group-item";
