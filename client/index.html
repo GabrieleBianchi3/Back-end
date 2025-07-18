@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Polling App – Client</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container py-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Polling App</h1>
+    <div>
+      <button id="logout-btn" onclick="logout()" class="btn btn-danger me-2" style="display: none;">Logout</button>
+      <a id="admin-btn" href="/admin/" target="_blank" class="btn btn-warning" style="display: none;">Area Admin</a>
+    </div>
+  </div>
+
+  <!-- Login Card -->
+  <div class="card mb-4" id="login-card">
+    <h2 class="card-header">Login</h2>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-4">
+          <input type="text" id="username" class="form-control" placeholder="Username">
+        </div>
+        <div class="col-md-4">
+          <input type="password" id="password" class="form-control" placeholder="Password">
+        </div>
+        <div class="col-md-4 d-grid">
+          <button onclick="login()" class="btn btn-primary">Login</button>
+        </div>
+      </div>
+      <p class="mt-2 text-success" id="token-info"></p>
+      <p class="text-danger" id="login-error"></p>
+    </div>
+  </div>
+
+  <!-- Register Card -->
+  <div class="card mb-4" id="register-card">
+    <h2 class="card-header">Registrati</h2>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <input type="text" id="reg-username" class="form-control" placeholder="Username">
+        </div>
+        <div class="col-md-3">
+          <input type="password" id="reg-password" class="form-control" placeholder="Password">
+        </div>
+        <div class="col-md-3">
+          <input type="email" id="reg-email" class="form-control" placeholder="Email">
+        </div>
+        <div class="col-md-3 d-grid">
+          <button onclick="register()" class="btn btn-secondary">Registrati</button>
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-md-4">
+          <h5>Data di nascita</h5>
+          <input type="date" id="reg-birth" class="form-control">
+        </div>
+      </div>
+      <p class="mt-2 text-success" id="register-info"></p>
+      <p class="text-danger" id="register-error"></p>
+    </div>
+  </div>
+
+  <!-- Polls Section -->
+  <div class="mb-4">
+    <button onclick="loadPolls()" class="btn btn-outline-success">Carica Sondaggi</button>
+  </div>
+  <ul id="poll-list" class="list-group mb-4"></ul>
+
+  <!-- Create Poll Section (solo utenti loggati) -->
+  <div class="card mb-4" id="create-poll-card" style="display:none;">
+    <div class="card-header">Crea un nuovo sondaggio</div>
+    <div class="card-body">
+      <div class="mb-2">
+        <input type="text" id="new-title" class="form-control" placeholder="Titolo">
+      </div>
+      <div class="mb-2">
+        <textarea id="new-description" class="form-control" placeholder="Descrizione"></textarea>
+      </div>
+      <div id="new-choices-container">
+        <input type="text" class="form-control mb-1 choice-input" placeholder="Opzione 1">
+        <input type="text" class="form-control mb-1 choice-input" placeholder="Opzione 2">
+      </div>
+      <button onclick="addChoiceField()" class="btn btn-sm btn-outline-secondary mb-2">Aggiungi Opzione</button>
+      <div>
+        <button onclick="createPoll()" class="btn btn-success">Crea Sondaggio</button>
+      </div>
+      <p class="text-danger mt-2" id="create-error"></p>
+    </div>
+  </div>
+
+  <!-- Results Section -->
+  <div id="results-section" class="card" style="display:none;">
+    <div class="card-header">Votazione</div>
+    <div class="card-body">
+      <div id="results-output"></div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- stato globale ----------
+    let accessToken = localStorage.getItem('access_token') || '';
+    let currentUser = null;
+
+    // ---------- inizializzazione ----------
+    window.addEventListener('DOMContentLoaded', () => {
+      if (accessToken) {
+        fetchCurrentUser();
+      }
+    });
+
+
+
+    function showEditForm(pollId) {
+    console.log("🚀 showEditForm invoked for poll", pollId);
+  // 1) recupera i dati correnti dal backend
+  fetch(`/api/polls/${pollId}/`)
+    .then(res => {
+      if (!res.ok) throw new Error("Impossibile recuperare il sondaggio");
+      return res.json();
+    })
+    .then(poll => {
+      // 2) chiedi il nuovo titolo
+      const newTitle = prompt("Modifica la domanda:", poll.title);
+      if (newTitle === null) return;  // l’utente ha annullato
+
+      // 3) chiedi la nuova descrizione
+      const newDesc = prompt("Modifica la descrizione:", poll.description || "");
+      if (newDesc === null) return;
+
+
+
+      // 5) invia la PATCH
+      return fetch(`/api/polls/${pollId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({
+          title: newTitle,
+          description: newDesc
+        })
+      });
+    })
+    .then(res => {
+      if (!res || !res.ok) throw new Error("Modifica fallita");
+      alert("Sondaggio aggiornato!");
+      loadPolls();  // ricarica la lista
+    })
+    .catch(err => alert(err.message));
+}
+
+    // ---------- UI Helpers ----------
+    function showAuthenticatedUI() {
+      document.getElementById("logout-btn").style.display = "inline-block";
+      document.getElementById("login-card").style.display = "none";
+      document.getElementById("register-card").style.display = "none";
+      document.getElementById("token-info").innerText = "Sei loggato.";
+      document.getElementById("create-poll-card").style.display = "block";
+    }
+
+    function resetUIOnLogout() {
+      document.getElementById("logout-btn").style.display = "none";
+      document.getElementById("admin-btn").style.display = "none";
+      document.getElementById("login-card").style.display = "block";
+      document.getElementById("register-card").style.display = "block";
+
+      document.getElementById("create-poll-card").style.display = "none";
+      // ← Svuota la lista dei sondaggi
+      document.getElementById("poll-list").innerHTML = "";
+      // ← Nasconde l’area risultati se visibile
+      document.getElementById("results-section").style.display = "none";
+
+      document.getElementById("token-info").innerText = "";
+      document.getElementById("login-error").innerText = "";
+
+
+    }
+
+    // ---------- Recupera utente corrente ----------
+    function fetchCurrentUser() {
+      fetch("/api/users/me/", {
+        headers: { "Authorization": "Bearer " + accessToken }
+      })
+      .then(res => res.json())
+      .then(user => {
+        currentUser = user.username;
+        if (user.is_staff) document.getElementById("admin-btn").style.display = "inline-block";
+        showAuthenticatedUI();
+        loadPolls();
+      })
+      .catch(() => {
+        resetUIOnLogout();
+        loadPolls();
+      });
+    }
+
+    // ---------- Login / Logout ----------
+    function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      fetch("/api/token/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      })
+      .then(res => res.json().then(body => ({ status: res.status, body })))
+      .then(({ status, body }) => {
+        if (status === 200 && body.access) {
+          accessToken = body.access;
+          localStorage.setItem('access_token', accessToken);
+
+          // **Qui pulisco i campi**
+          document.getElementById("username").value = "";
+          document.getElementById("password").value = "";
+
+
+          fetchCurrentUser();
+        } else {
+          document.getElementById("login-error").innerText = "Credenziali errate.";
+        }
+      })
+      .catch(() => {
+        document.getElementById("login-error").innerText = "Errore di connessione.";
+      });
+    }
+
+    //function logout() {
+    //  accessToken = '';
+    //  localStorage.removeItem('access_token');
+    //  resetUIOnLogout();
+    //  alert("Logout effettuato.");
+    //}
+
+    function logout() {
+      accessToken = "";
+      currentUser = null;                   // reset dell’utente
+      localStorage.removeItem("access_token");
+
+      resetUIOnLogout();
+      //loadPolls();                          // ricarica sondaggi in modalità anonima
+      document.getElementById("results-section").style.display = "none";
+      alert("Logout effettuato.");
+    }
+
+
+
+    // ---------- Register ----------
+    function register() {
+      const data = {
+        username: document.getElementById("reg-username").value,
+        password: document.getElementById("reg-password").value,
+        email: document.getElementById("reg-email").value,
+        birth_date: document.getElementById("reg-birth").value,
+      };
+      fetch("/api/users/register/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+      .then(res => res.json().then(body => ({ status: res.status, body })))
+      .then(({ status, body }) => {
+        if (status === 201) {
+          document.getElementById("register-info").innerText = "Registrazione OK! Effettua il login.";
+
+          // **Qui pulisco i campi**
+          ["reg-username","reg-password","reg-email","reg-birth"].forEach(id => document.getElementById(id).value = "");
+
+
+          document.getElementById("register-error").innerText = "";
+        } else {
+          document.getElementById("register-error").innerText = Object.values(body).flat().join(" | ");
+          document.getElementById("register-info").innerText = "";
+        }
+      })
+      .catch(() => {
+        document.getElementById("register-error").innerText = "Errore di connessione.";
+      });
+    }
+
+
+
+
+
+    // ---------- Polls / Voting / Results / Delete ----------
+    function loadPolls() {
+      fetch("/api/polls/", {
+        headers: {
+          "Authorization": accessToken ? ("Bearer " + accessToken) : undefined
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const polls = Array.isArray(data) ? data : data.results;
+        const list = document.getElementById("poll-list");
+        list.innerHTML = "";
+        polls.forEach(poll => {
+          const isOwner = accessToken && currentUser === poll.created_by;
+          let actions = `
+            <button class="btn btn-sm btn-primary me-2" onclick="loadChoices(${poll.id})">Vota</button>
+            <button class="btn btn-sm btn-secondary me-2" onclick="viewResults(${poll.id})">Risultati</button>`;
+          if (isOwner) {
+            actions += `
+                <button class="btn btn-sm btn-outline-info me-2"
+                        onclick="showEditForm(${poll.id})">
+                Modifica
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deletePoll(${poll.id})">Cancella</button>`;
+          }
+          const li = document.createElement("li");
+          li.className = "list-group-item";
+          li.innerHTML = `<div><strong>${poll.title}</strong> <small>di ${poll.created_by}</small></div><div class="mt-1">${actions}</div>`;
+          list.appendChild(li);
+        });
+      })
+      .catch(err => alert("Errore nel caricamento sondaggi: " + err));
+    }
+
+    function deletePoll(pollId) {
+      if (!confirm("Sei sicuro di cancellare questo sondaggio?")) return;
+      fetch(`/api/polls/${pollId}/`, {
+        method: "DELETE",
+        headers: { "Authorization": "Bearer " + accessToken }
+      })
+      .then(res => {
+        if (res.status === 204) {
+          alert("Sondaggio cancellato.");
+          loadPolls();
+        } else {
+          alert("Errore nella cancellazione.");
+        }
+      });
+    }
+
+    function loadChoices(pollId) {
+      fetch(`/api/polls/${pollId}/`)
+      .then(res => res.json())
+      .then(poll => {
+        const choices = poll.choices.map(c =>
+          `<div class="form-check">
+             <input class="form-check-input" type="radio" name="choice" value="${c.id}" id="choice${c.id}">
+             <label class="form-check-label" for="choice${c.id}">${c.text}</label>
+           </div>`
+        ).join("");
+        document.getElementById("results-output").innerHTML = `
+          <h5>${poll.title}</h5>
+          <h8>${poll.description}</h8>
+          ${choices}
+          <button class="btn btn-success mt-3" onclick="sendVote(${poll.id})">Invia voto</button>`;
+        document.getElementById("results-section").style.display = "block";
+      });
+    }
+
+    function sendVote(pollId) {
+      // → BLOCCO VOTO ANONIMO
+      if (!accessToken) {
+        alert("Non è possibile votare. Effettua il login.");
+        return;
+      }
+
+
+      const selected = document.querySelector('input[name="choice"]:checked');
+      if (!selected) return alert("Seleziona un'opzione!");
+      fetch(`/api/polls/${pollId}/vote/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ choice: parseInt(selected.value) })
+      })
+      .then(res => {
+        if (res.status === 201) { alert("Voto registrato!"); viewResults(pollId); }
+        else { res.json().then(b => alert("Errore: " + JSON.stringify(b))); }
+      });
+    }
+
+    function viewResults(pollId) {
+      fetch(`/api/polls/${pollId}/results/`)
+      .then(res => res.json())
+      .then(data => {
+        let msg = `Risultati – ${data.poll}\n\n`;
+        data.results.forEach(c => msg += `${c.choice}: ${c.votes} voti\n`);
+        alert(msg);
+      })
+      .catch(() => alert("Errore nel recupero risultati."));
+    }
+
+    // ---------- Create Poll Functions ----------
+    function addChoiceField() {
+      const container = document.getElementById("new-choices-container");
+      const count = container.querySelectorAll(".choice-input").length + 1;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "form-control mb-1 choice-input";
+      input.placeholder = `Opzione ${count}`;
+      container.appendChild(input);
+    }
+
+    function createPoll() {
+      const title = document.getElementById("new-title").value.trim();
+      const description = document.getElementById("new-description").value.trim();
+      const choices = Array.from(document.querySelectorAll(".choice-input")).map(i => i.value.trim()).filter(v => v);
+      if (!title || choices.length < 2) {
+        document.getElementById("create-error").innerText = "Titolo e almeno 2 opzioni richiesti.";
+        return;
+      }
+      document.getElementById("create-error").innerText = "";
+      fetch("/api/polls/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ title, description, choices })
+      })
+      .then(res => { if (res.status === 201) return res.json(); throw new Error("Errore creazione sondaggio"); })
+      .then(poll => {
+        document.getElementById("new-title").value = "";
+        document.getElementById("new-description").value = "";
+        const container = document.getElementById("new-choices-container");
+        container.innerHTML = `
+          <input type="text" class="form-control mb-1 choice-input" placeholder="Opzione 1">
+          <input type="text" class="form-control mb-1 choice-input" placeholder="Opzione 2">
+        `;
+        loadPolls();
+        alert("Sondaggio creato!");
+      })
+      .catch(err => { document.getElementById("create-error").innerText = err.message; });
+    }
+
+  </script>
+</body>
+</html>
