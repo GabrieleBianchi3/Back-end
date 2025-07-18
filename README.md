@@ -1,4 +1,4 @@
-# 🗳️ Polling Application – REST API + Client
+# Polling Application – REST API + Client
 
 Questa applicazione è pensata per creare, votare e consultare sondaggi online. È costruita con Django e Django REST Framework, e include anche una pagina HTML molto semplice (senza template Django) che consente di interagire direttamente con le API usando `fetch()` e token JWT.
 
@@ -119,18 +119,6 @@ L’interfaccia è semplice e funziona anche aprendo il file direttamente da bro
 
 ---
 
-## Deploy (esempio Railway)
-
-1. Aggiungi le variabili d’ambiente da `.env.example`
-2. Usa `Procfile` con Gunicorn
-3. Esegui:
-   ```bash
-   python manage.py migrate
-   python manage.py createsuperuser
-   ```
-
----
-
 ## Struttura delle cartelle principali
 
 ```
@@ -156,17 +144,3 @@ Back-end-main/
 ```
 
 ---
-
-## Licenza
-
-Questo progetto è stato sviluppato a fini formativi ed è liberamente utilizzabile.\
-Se lo riusi o lo modifichi, è buona norma citare l’autore.
-
----
-
-## Autore
-
-
-
----
-
